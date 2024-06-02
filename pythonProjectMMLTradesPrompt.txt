@@ -3937,6 +3937,7 @@ webbrowser.open("https://app.alpaca.markets/paper/dashboard/overview")
 
 
 
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -3975,30 +3976,18 @@ y = np.where(data['Close'].shift(-1).reindex(X.index) > X['Close'], 1, -1)
 model = make_pipeline(StandardScaler(), RandomForestClassifier(n_estimators=100, random_state=42))
 model.fit(X, y)
 
-# Define the symbol you're interested in trading
-symbol = 'BTCUSD'
+# 預測交易信號
+pred = model.predict(X)
+data['Position'] = pd.Series(pred, index=X.index)
 
-# Get account information
-account = api.get_account()
-buying_power = float(account.buying_power)
-
-# Get the current price of the asset
-asset_price = data['Close'].iloc[-1]
-
-# Check buying power before placing buy order
-if buying_power >= asset_price:
-    # Predict trading signals
-    pred = model.predict(X)
-    data['Position'] = pd.Series(pred, index=X.index)
-
-    # Initialize variables to track order status
-    last_position = 0
-
-    # Iterate through each trading signal
-    for index, position in data['Position'].iteritems():
-        # Check if the position has changed
-        if position != last_position:
-            if position == 1:  # Buy signal
+# Alpaca下單函數
+def submit_order(position, symbol):
+    try:
+        if position == 1:
+            account = api.get_account()
+            buying_power = float(account.buying_power)
+            asset_price = float(data['Close'].iloc[-1])  # Assuming you're using the latest closing price for the asset
+            if buying_power >= asset_price:
                 api.submit_order(
                     symbol=symbol,
                     qty=1,
@@ -4006,20 +3995,58 @@ if buying_power >= asset_price:
                     type='market',
                     time_in_force='gtc'
                 )
-                print(f"Bought 1 unit of {symbol} at market price.")
-            elif position == -1:  # Sell signal
-                api.submit_order(
-                    symbol=symbol,
-                    qty=1,
-                    side='sell',
-                    type='market',
-                    time_in_force='gtc'
-                )
-                print(f"Sold 1 unit of {symbol} at market price.")
-            last_position = position
+            else:
+                print("Insufficient buying power to place buy order.")
+        elif position == -1:
+            positions = api.list_positions()
+            existing_positions = {pos.symbol: pos for pos in positions}
+            if symbol in existing_positions:
+                asset_qty = float(existing_positions[symbol].qty)
+                if asset_qty >= 1:
+                    api.submit_order(
+                        symbol=symbol,
+                        qty=1,
+                        side='sell',
+                        type='market',
+                        time_in_force='gtc'
+                    )
+                else:
+                    print("Insufficient asset quantity to place sell order.")
+            else:
+                print(f"No existing position for {symbol}.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
 
-# Generate HTML content, plot, and open browser
+# 執行交易
+for i in range(len(data)):
+    submit_order(data['Position'].iloc[i], 'BTCUSD')
 
+# 計算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 累積收益計算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Position'] == 1].index
+sell_signals = data[data['Position'] == -1].index
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (Random Forest)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
 html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -4054,7 +4081,6 @@ with open("trading_RF_result.html", "w", encoding="utf-8") as file:
 
 # 打開瀏覽器並導航到Alpaca模擬交易結果的官網
 webbrowser.open("https://app.alpaca.markets/paper/dashboard/overview")
-
 
 
 
@@ -4237,11 +4263,1120 @@ webbrowser.open("https://app.alpaca.markets/paper/dashboard/overview")
 -------------------------------
 
 
+yfinance：用於下載歷史金融數據
+pip install yfinance
+
+pandas：用於數據操作和分析
+pip install pandas
+
+
+numpy：用於數值計算
+pip install numpy
+
+plotly：用於交互式繪圖
+pip install plotly
+
+scikit-learn：用於機器學習模型和數據預處理
+pip install scikit-learn
+
+alpaca-trade-api：用於與 Alpaca 交易 API 進行交互
+pip install alpaca-trade-api
+
+yfinance：用于下载历史金融数据
+pip install yfinance
+
+pandas：用于数据操作和分析
+pip install pandas
+
+numpy：用于数值计算
+pip install numpy
+
+plotly：用于交互式绘图
+pip install plotly
+
+scikit-learn：用于机器学习模型和数据预处理
+pip install scikit-learn
+
+alpaca-trade-api：用于与 Alpaca 交易 API 进行交互
+pip install alpaca-trade-api
+
+
+tensorflow：用于构建和训练神经网络模型。
+pip install tensorflow
+
+
+scikit-learn：用于数据预处理和建立随机森林模型。
+pip install scikit-learn
 
 
 
 
 
+-------------------------------MMLPackage
+-------------------------------不用說明流程 跟我說需要安裝那些套件 pip install ?  請用中文繁體為我說明
+-------------------------------
+
+
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+
+import yfinance as yf
+import pandas as pd
+import webbrowser
+import plotly.graph_objects as go
+
+# 下載黃金歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-01')
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick')])
+
+fig.update_layout(title='Gold Trading Strategy', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_result.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_result.html")
+
+
+
+-------------------------------無交易策略 , 0
+-------------------------------111
+-------------------------------
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense
+
+# 下載比特幣歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-03')
+
+# 計算移動平均線
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 移除NaN值
+data.dropna(inplace=True)
+
+# 準備特徵和目標變量
+X = data[['SMA_5', 'SMA_20', 'SMA_60', 'SMA_120']].values
+y = np.where(data['Close'].shift(-1) > data['Close'], 1, 0)
+
+# 划分訓練集和測試集
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 特徵標準化
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 構建CNN模型
+model = Sequential([
+    Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(X_train_scaled.shape[1], 1)),
+    MaxPooling1D(pool_size=2),
+    Flatten(),
+    Dense(50, activation='relu'),
+    Dense(1, activation='sigmoid')
+])
+
+# 編譯模型
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# 將數據調整為CNN模型的輸入形狀
+X_train_scaled = X_train_scaled.reshape((X_train_scaled.shape[0], X_train_scaled.shape[1], 1))
+X_test_scaled = X_test_scaled.reshape((X_test_scaled.shape[0], X_test_scaled.shape[1], 1))
+
+# 訓練模型
+model.fit(X_train_scaled, y_train, epochs=10, batch_size=32, validation_data=(X_test_scaled, y_test), verbose=0)
+
+# 使用模型進行預測
+predictions = model.predict(X_test_scaled)
+predictions_binary = (predictions > 0.5).astype(int)
+
+# 將預測結果添加到數據框中
+data['Predicted_Signal'] = np.nan
+data.iloc[-len(predictions_binary):, -1] = predictions_binary.flatten()
+
+# 計算策略收益率
+data['Strategy_Return'] = np.where((data['SMA_120'] < data['Close']) & (data['Close'].pct_change() > 0.005), 1,
+                                   np.where((data['SMA_120'] > data['Close']) & (data['SMA_5'] < data['SMA_20']), -1,
+                                            0)) * data['Close'].pct_change()
+
+# 累積收益計算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Predicted_Signal'] == 1].index
+sell_signals = data[data['Predicted_Signal'] == 0].index
+
+# 生成互動式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='買入信號',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='賣出信號',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD 交易策略 (CNN)', xaxis_title='日期', yaxis_title='價格', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>累積收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易點位</h2>
+    <ul>
+        <li>買入點位: {buy_signals[:3].to_list()}</li>
+        <li>賣出點位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_CNNresult.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_CNNresult.html")
+
+
+
+
+
+
+
+-------------------------------CNN ,34662326589080
+-------------------------------222
+-------------------------------
+
+
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+# 下载比特币历史数据
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-01')
+
+# 计算移动平均线 (SMA) 作为趋势指标
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持仓
+data['Position'] = 0
+
+# 将前一天的价格加入作为特征
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 确定交易信号
+data['Buy_Signal'] = np.where(
+    (data['Close'] > data['SMA_120']) & (data['Close'] > data['Previous_Close'] * 1.005),
+    1, 0
+)
+data['Sell_Signal'] = np.where(
+    (data['Close'] < data['SMA_120']) & (data['Close'] < data['SMA_5']) & (data['Close'] < data['SMA_20']),
+    1, 0
+)
+
+# 模拟交易
+for i in range(1, len(data)):
+    if data['Buy_Signal'].iloc[i] == 1:
+        data['Position'].iloc[i] = 1
+    elif data['Sell_Signal'].iloc[i] == 1:
+        data['Position'].iloc[i] = 0
+    else:
+        data['Position'].iloc[i] = data['Position'].iloc[i-1]
+
+# 计算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 累计收益计算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 准备特征和目标变量
+X = data[['SMA_5', 'SMA_20', 'SMA_60', 'SMA_120']].values
+y = np.where(data['Close'].shift(-1) > data['Close'], 1, 0)
+
+# 划分训练集和测试集
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 特征标准化
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 构建DNN模型
+model = Sequential([
+    Dense(64, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+    Dense(32, activation='relu'),
+    Dense(1, activation='sigmoid')
+])
+
+# 编译模型
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# 训练模型
+model.fit(X_train_scaled, y_train, epochs=10, batch_size=32, validation_data=(X_test_scaled, y_test))
+
+# 使用模型进行预测
+predictions = model.predict(X_test_scaled)
+predictions_binary = (predictions > 0.5).astype(int)
+
+# 将预测结果添加到数据框中
+data['Predicted_Signal'] = np.nan
+data.iloc[-len(predictions_binary):, -1] = predictions_binary.flatten()
+
+# 计算策略收益率
+data['Strategy_Return'] = data['Predicted_Signal'] * data['Close'].pct_change()
+
+# 累积收益计算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易点位
+buy_signals = data[data['Predicted_Signal'] == 1].index
+sell_signals = data[data['Predicted_Signal'] == 0].index
+
+# 生成交互式图表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (Simple Moving Average + DNN)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML内容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易结果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易结果</h1>
+    <h2>累积收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易点位</h2>
+    <ul>
+        <li>买入点位: {buy_signals[:3].to_list()}</li>
+        <li>卖出点位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易图表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 写入HTML文件
+with open("trading_result.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打开浏览器
+webbrowser.open("trading_result.html")
+
+
+
+
+-------------------------------DNN ,  3.28
+-------------------------------333
+-------------------------------
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
+# 下载比特币历史数据
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-03')
+
+# 计算移动平均线 (SMA) 作为趋势指标
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持仓
+data['Position'] = 0
+
+# 将前一天的价格加入作为特征
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 确定交易信号
+data['Buy_Signal'] = np.where(
+    (data['Close'] > data['SMA_120']) & (data['Close'] > data['Previous_Close'] * 1.005),
+    1, 0
+)
+data['Sell_Signal'] = np.where(
+    (data['Close'] < data['SMA_120']) & (data['Close'] < data['SMA_5']) & (data['Close'] < data['SMA_20']),
+    1, 0
+)
+
+# 模拟交易
+for i in range(1, len(data)):
+    if data['Buy_Signal'].iloc[i] == 1:
+        data['Position'].iloc[i] = 1
+    elif data['Sell_Signal'].iloc[i] == 1:
+        data['Position'].iloc[i] = 0
+    else:
+        data['Position'].iloc[i] = data['Position'].iloc[i-1]
+
+# 计算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 准备特征和目标变量
+X = data[['SMA_5', 'SMA_20', 'SMA_60', 'SMA_120']].values
+y = np.where(data['Close'].shift(-1) > data['Close'], 1, 0)
+
+# 划分训练集和测试集
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 数据标准化
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 重塑数据以符合LSTM输入要求
+X_train_reshaped = X_train_scaled.reshape((X_train_scaled.shape[0], 1, X_train_scaled.shape[1]))
+X_test_reshaped = X_test_scaled.reshape((X_test_scaled.shape[0], 1, X_test_scaled.shape[1]))
+
+# 构建LSTM模型
+model = Sequential([
+    LSTM(50, input_shape=(X_train_reshaped.shape[1], X_train_reshaped.shape[2])),
+    Dense(1, activation='sigmoid')
+])
+
+# 编译模型
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# 训练模型
+model.fit(X_train_reshaped, y_train, epochs=10, batch_size=32, validation_data=(X_test_reshaped, y_test))
+
+# 使用模型进行预测
+predictions = model.predict(X_test_reshaped)
+predictions_binary = (predictions > 0.5).astype(int)
+
+# 将预测结果添加到数据框中
+data['Predicted_Signal'] = np.nan
+data.iloc[-len(predictions_binary):, -1] = predictions_binary.flatten()
+
+# 计算策略收益率
+data['Strategy_Return'] = data['Predicted_Signal'] * data['Close'].pct_change()
+
+# 累积收益计算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易点位
+buy_signals = data[data['Predicted_Signal'] == 1].index
+sell_signals = data[data['Predicted_Signal'] == 0].index
+
+# 生成交互式图表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (LSTM)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML内容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易结果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易结果</h1>
+    <h2>累积收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易点位</h2>
+    <ul>
+        <li>买入点位: {buy_signals[:3].to_list()}</li>
+        <li>卖出点位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易图表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 写入HTML文件
+with open("trading_LSTMresult.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打开浏览器
+webbrowser.open("trading_LSTMresult.html")
+
+
+
+-------------------------------LSTM ,1
+-------------------------------444
+-------------------------------
+
+
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+# 下載黃金歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-03')
+
+# 計算移動平均線 (SMA) 作為趨勢指標
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持倉
+data['Position'] = 0
+
+# 將前一天的價格加入作為特徵
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 訓練Random Forest模型
+X = data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'SMA_120', 'Previous_Close']].dropna()
+y = np.where(data['Close'].shift(-1).reindex(X.index) > X['Close'], 1, -1)
+model = make_pipeline(StandardScaler(), RandomForestClassifier(n_estimators=100, random_state=42))
+model.fit(X, y)
+
+# 預測交易信號
+pred = model.predict(X)
+data['Position'] = pd.Series(pred, index=X.index)
+
+# 計算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 累積收益計算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Position'] == 1].index
+sell_signals = data[data['Position'] == -1].index
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (Random Forest)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>累積收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易點位</h2>
+    <ul>
+        <li>買進點位: {buy_signals[:3].to_list()}</li>
+        <li>賣出點位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_RFresult.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_RFresult.html")
+
+
+
+
+
+
+-------------------------------RF  og , 3443292022075531043761681032282112
+-------------------------------55
+-------------------------------
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+# 下載黃金歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-03')
+
+# 計算移動平均線 (SMA) 作為趨勢指標
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持倉
+data['Position'] = 0
+
+# 將前一天的價格加入作為特徵
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 根據策略生成交易信號
+data['Buy_Signal'] = ((data['Close'] > data['SMA_120']) &
+                      (data['Close'] > data['Previous_Close'] * 1.005)).astype(int)
+
+data['Sell_Signal'] = ((data['Close'] < data['SMA_120']) &
+                       (data['Close'] < data['SMA_5']) &
+                       (data['Close'] < data['SMA_20'])).astype(int)
+
+# 初始化持倉狀態
+position = 0
+
+# 生成交易信號
+for i in range(len(data)):
+    if data['Buy_Signal'].iloc[i] == 1:
+        position = 1
+    elif data['Sell_Signal'].iloc[i] == 1:
+        position = 0
+    data['Position'].iloc[i] = position
+
+# 特徵和目標變量
+X = data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'SMA_120', 'Previous_Close']].dropna()
+y = np.where(data['Close'].shift(-1).reindex(X.index) > X['Close'], 1, -1)
+
+# 初始化随机森林模型
+model = make_pipeline(StandardScaler(), RandomForestClassifier(n_estimators=100, random_state=42))
+
+# 訓練模型
+model.fit(X, y)
+
+# 預測交易信號
+pred = model.predict(X)
+data['Position'] = pd.Series(pred, index=X.index)
+
+# 計算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 累積收益計算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Position'] == 1].index
+sell_signals = data[data['Position'] == -1].index
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (Random Forest)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>累積收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易點位</h2>
+    <ul>
+        <li>買進點位: {buy_signals[:3].to_list()}</li>
+        <li>賣出點位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_RFresult.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_RFresult.html")
+
+
+
+
+-------------------------------RF ,3444176897634617282146858153541632
+-------------------------------666 555
+-------------------------------
+
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from sklearn.model_selection import train_test_split
+
+# 下載比特幣歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-01')
+
+# 計算移動平均線 (SMA) 作為趨勢指標
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持倉
+data['Position'] = 0
+
+# 將前一天的價格加入作為特徵
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 準備訓練數據
+X = data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'SMA_120', 'Previous_Close']].dropna()
+y = np.where(data['Close'].shift(-1).reindex(X.index) > X['Close'], 1, 0)  # 修改標籤，不再使用-1，1
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False)
+
+# 由於循環神經網絡需要 3D 的輸入 (samples, time steps, features)
+# 我們需要重塑數據
+X_train = np.reshape(X_train.values, (X_train.shape[0], 1, X_train.shape[1]))
+X_test = np.reshape(X_test.values, (X_test.shape[0], 1, X_test.shape[1]))
+
+# 建立循環神經網絡模型
+model = Sequential([
+    LSTM(units=50, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])),
+    Dropout(0.2),
+    LSTM(units=50, return_sequences=True),
+    Dropout(0.2),
+    LSTM(units=50),
+    Dropout(0.2),
+    Dense(units=1, activation='sigmoid')
+])
+
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# 訓練模型
+model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=0)
+
+# 在測試數據上進行預測
+pred_proba = model.predict(X_test)
+pred = (pred_proba > 0.5).astype(int).reshape(-1)
+
+# 將預測轉換為 DataFrame
+pred_df = pd.DataFrame(pred_proba, index=X.index[-len(pred_proba):], columns=['Position'])
+
+# 將預測值分配到 'Position' 列
+data['Position'] = 0  # 重新初始化
+data.loc[pred_df.index, 'Position'] = pred_df['Position']
+
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 計算累積收益
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Position'] == 1].index
+sell_signals = data[data['Position'] == 0].index
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='Gold Trading Strategy (RNN)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>累積收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易點位</h2>
+    <ul>
+        <li>買入點位: {buy_signals[:3].to_list()}</li>
+        <li>賣出點位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_RNN_result.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_RNN_result.html")
+
+
+
+
+
+-------------------------------RNN , 1.86
+-------------------------------777
+-------------------------------
+
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import webbrowser
+import plotly.graph_objects as go
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+# 下載比特幣歷史數據
+data = yf.download('BTC-USD', start='2015-01-01', end='2024-06-03')
+
+# 計算移動平均線 (SMA) 作為趨勢指標
+data['SMA_5'] = data['Close'].rolling(window=5).mean()
+data['SMA_20'] = data['Close'].rolling(window=20).mean()
+data['SMA_60'] = data['Close'].rolling(window=60).mean()
+data['SMA_120'] = data['Close'].rolling(window=120).mean()
+
+# 初始化持倉
+data['Position'] = 0
+
+# 將前一天的價格加入作為特徵
+data['Previous_Close'] = data['Close'].shift(1)
+
+# 訓練SVM模型
+X = data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'SMA_120', 'Previous_Close']].dropna()
+y = np.where(data['Close'].shift(-1).reindex(X.index) > X['Close'], 1, -1)
+model = make_pipeline(StandardScaler(), SVC(C=1, kernel='rbf', gamma='auto'))
+model.fit(X, y)
+
+# 預測交易信號
+pred = model.predict(X)
+data['Position'] = pd.Series(pred, index=X.index)
+
+# 計算策略收益率
+data['Strategy_Return'] = data['Position'].shift(1) * data['Close'].pct_change()
+
+# 累積收益計算
+cumulative_return = (data['Strategy_Return'] + 1).cumprod()
+final_cumulative_return = cumulative_return.iloc[-1]
+
+# 生成交易點位
+buy_signals = data[data['Position'] == 1].index
+sell_signals = data[data['Position'] == -1].index
+
+# 生成交互式圖表
+fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                     open=data['Open'],
+                                     high=data['High'],
+                                     low=data['Low'],
+                                     close=data['Close'],
+                                     name='Candlestick'),
+                      go.Scatter(x=buy_signals, y=data.loc[buy_signals]['Low'], mode='markers', name='Buy Signal',
+                                 marker=dict(color='green', size=10, symbol='triangle-up')),
+                      go.Scatter(x=sell_signals, y=data.loc[sell_signals]['High'], mode='markers', name='Sell Signal',
+                                 marker=dict(color='red', size=10, symbol='triangle-down'))])
+
+fig.update_layout(title='BTC-USD Trading Strategy (SVM)', xaxis_title='Date', yaxis_title='Price', showlegend=True)
+
+# 生成HTML內容
+html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易結果</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>交易結果</h1>
+    <h2>累積收益</h2>
+    <p>{final_cumulative_return:.2f}</p>
+    <h2>交易點位</h2>
+    <ul>
+        <li>買進點位: {buy_signals[:3].to_list()}</li>
+        <li>賣出點位: {sell_signals[:3].to_list()}</li>
+    </ul>
+    <h2>交易圖表</h2>
+    <div id="plotly-chart"></div>
+    <script>
+        var figure = {fig.to_json()};
+        Plotly.newPlot('plotly-chart', figure.data, figure.layout);
+    </script>
+</body>
+</html>
+"""
+
+# 寫入HTML文件
+with open("trading_SVMresult.html", "w", encoding="utf-8") as file:
+    file.write(html_content)
+
+# 打開瀏覽器
+webbrowser.open("trading_SVMresult.html")
+
+
+
+
+-------------------------------SVM , 147.8
+-------------------------------888
+-------------------------------
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+
+
+
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+
+
+
+-------------------------------
+-------------------------------
+-------------------------------
+
+
+  這裡面是否LSTM 模型? 如果沒有請幫我加進去 並寫給我完整修正版可以執行正確的版本
+
+
+
+移動平均線交易策略，它的主要邏輯如下：
+
+計算了四個移動平均線，分別是5日、20日、60日和120日的平均線。
+根據收盤價相對於這些移動平均線的位置和前一天的收盤價的變化，定義了交易條件：
+如果收盤價超過120日移動平均線，並且當天收盤價比前一天上漲了0.5%，則買進。
+如果收盤價跌破120日移動平均線，並且同時跌破5日和20日移動平均線，則賣出。
+如果已經持有頭寸，並且當天收盤價比前一天上漲了0.5%，則平倉。
+根據交易條件生成買入和賣出信號。
+使用這些買入和賣出信號繪製了交易圖表，並計算了交易策略的累積收益率。
+
+
+請幫我套用簡單的移動平均線交易策略，它的主要邏輯如下：
+
+計算了四個移動平均線，分別是5日、20日、60日和120日的平均線。
+根據收盤價相對於這些移動平均線的位置和前一天的收盤價的變化，定義了交易條件：
+如果收盤價超過120日移動平均線，並且當天收盤價比前一天上漲了0.5%，則買進。
+如果收盤價跌破120日移動平均線，並且同時跌破5日和20日移動平均線，則賣出。
+如果已經持有頭寸，並且當天收盤價比前一天上漲了0.5%，則平倉。
+根據交易條件生成買入和賣出信號。
+使用這些買入和賣出信號繪製了交易圖表，並計算了交易策略的累積收益率。 這個交易策略 訓練模型使用CNN 請幫我檢查程式碼是否符合我給你的交易策略 若不符合 請幫我重寫一個新的完整可執行的程式碼包含我給你的策略與cnn訓練模型
+
+
+
+
+
+
+
+
+請幫我檢查交易策略是否有:  
+移動平均線交易策略，它的主要邏輯如下：
+
+計算了四個移動平均線，分別是5日、20日、60日和120日的平均線。
+根據收盤價相對於這些移動平均線的位置和前一天的收盤價的變化，定義了交易條件：
+如果收盤價超過120日移動平均線，並且當天收盤價比前一天上漲了0.5%，則買進。
+如果收盤價跌破120日移動平均線，並且同時跌破5日和20日移動平均線，則賣出。
+如果已經持有頭寸，並且當天收盤價比前一天上漲了0.5%，則平倉。
+根據交易條件生成買入和賣出信號。
+使用這些買入和賣出信號繪製了交易圖表，並計算了交易策略的累積收益率。   如果沒有請幫我添加 並且不要把訓練模型刪掉  
+並給我完整正確修正版可以執行的程式碼累積盈餘不會出現nan 程式碼內所有中文都換成繁體中文
 
 
 
